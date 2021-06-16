@@ -1,4 +1,5 @@
 import {
+  decorate,
   decodeGraph,
   decodeQuery,
   wrapObject,
@@ -19,8 +20,7 @@ export default class Graffy {
     this.path = path;
   }
 
-  on(type, ...args) {
-    const [path, handler] = validateOn(...args);
+  on(type, path, handler) {
     this.core.on(type, path, handler);
   }
 
@@ -31,10 +31,14 @@ export default class Graffy {
       'read',
       path,
       shiftFn(async function porcelainRead(query, options) {
-        return finalize(
-          encodeGraph(await handle(decodeQuery(query), options)),
-          query,
-        );
+        // console.log('onRead', path, query);
+        const decoded = decodeQuery(query);
+        // console.log('decoded', path, decoded);
+        const encoded = encodeGraph(await handle(decoded, options));
+        // console.log({ encoded });
+        const finalized = finalize(encoded, query);
+        // console.log({ finalized });
+        return finalized;
       }, path),
     );
   }
@@ -91,7 +95,7 @@ export default class Graffy {
     const rootQuery = wrapObject(porcelainQuery, path);
     const query = encodeQuery(rootQuery);
     const result = await this.call('read', query, options || {});
-    return unwrapObject(decodeGraph(result, rootQuery), path);
+    return unwrapObject(decorate(result, rootQuery), path);
   }
 
   watch(...args) {
@@ -100,7 +104,7 @@ export default class Graffy {
     const query = encodeQuery(rootQuery);
     const stream = this.call('watch', query, options || {});
     return mapStream(stream, (value) =>
-      unwrapObject(decodeGraph(value, rootQuery), path),
+      unwrapObject(decorate(value, rootQuery), path),
     );
   }
 
